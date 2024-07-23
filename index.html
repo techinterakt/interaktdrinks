@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Group Selection App</title>
+  <style>
+    :root {
+      --bg-color: #f4f4f4;
+      --text-color: #000;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+    }
+    .container {
+      max-width: 1200px;
+      margin: auto;
+      padding: 20px;
+      text-align: center;
+    }
+    .hidden {
+      display: none;
+    }
+    .progress-container {
+      width: 100%;
+      background-color: #f3f3f3;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+    .progress-bar {
+      width: 0%;
+      height: 20px;
+      background-color: #4caf50;
+      border-radius: 5px;
+      transition: width 0.4s ease;
+    }
+    .tooltip {
+      position: relative;
+      display: inline-block;
+    }
+    .tooltip .tooltiptext {
+      visibility: hidden;
+      width: 120px;
+      background-color: #333;
+      color: #fff;
+      text-align: center;
+      border-radius: 5px;
+      padding: 5px;
+      position: absolute;
+      z-index: 1;
+      bottom: 125%;
+      left: 50%;
+      margin-left: -60px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .tooltip:hover .tooltiptext {
+      visibility: visible;
+      opacity: 1;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 16px;
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+      background-color: #007bff;
+      color: white;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .member, .drink, .summary-item {
+      border: 2px solid transparent;
+      padding: 10px;
+      cursor: pointer;
+      border-radius: 5px;
+      transition: border-color 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .member.selected, .drink.selected, .member-item:hover, .drink-item:hover {
+      border-color: blue;
+    }
+    img {
+      max-width: 100px;
+      max-height: 100px;
+      object-fit: cover;
+      border-radius: 5px;
+    }
+    .large-img {
+      max-width: 150px;
+      max-height: 150px;
+    }
+    .extra-large-img {
+      max-width: 200px;
+      max-height: 200px;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 20px;
+    }
+    .summary-container {
+      max-height: 80vh;
+      overflow-y: auto;
+      padding: 10px;
+    }
+    .summary-item {
+      text-align: center;
+      display: flex;
+      flex: 1 1 200px; /* Adjust to ensure flexibility and scaling */
+      max-width: 200px; /* Set a max-width to prevent items from being too large */
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #ccc;
+      padding: 20px;
+      border-radius: 10px;
+      background-color: #fff;
+    }
+    .summary-item img {
+      margin-bottom: 10px;
+    }
+    .highlight {
+      border-color: green !important;
+    }
+    .member-list, .drink-options {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+    }
+    .half {
+      width: 50%;
+      float: left;
+      box-sizing: border-box;
+      padding: 10px;
+    }
+    .clearfix::after {
+      content: "";
+      clear: both;
+      display: table;
+    }
+    .scrollable {
+      overflow-y: auto;
+      max-height: 80vh;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 90%;
+      max-width: 600px;
+      max-height: 80%;
+      background-color: white;
+      border: 1px solid #ccc;
+      padding: 20px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+      z-index: 1000;
+      overflow-y: auto;
+    }
+    .modal.active {
+      display: block;
+    }
+    .modal-header, .modal-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-body {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="page1">
+    <h1>Interakt Drinks Chooser</h1>
+    <div class="progress-container">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <div id="main-page">
+      <h2>Who's in today?</h2>
+      <div class="member-list" id="member-list" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
+      <button id="start-btn" class="tooltip">Start<span class="tooltiptext">Click to start drink selection!</span></button>
+    </div>
+    <div id="settings-modal" class="modal" role="dialog" aria-labelledby="settings-modal-title">
+      <div class="modal-header">
+        <h2 id="settings-modal-title">Settings</h2>
+        <button id="close-settings-btn" aria-label="Close settings">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div>
+          <h3>Add Participant</h3>
+          <input type="text" id="member-name" placeholder="Member Name" aria-label="Member Name">
+          <input type="file" id="member-picture" aria-label="Member Picture">
+          <button id="camera-member-btn">Take Picture</button>
+          <video id="member-camera" class="hidden"></video>
+          <canvas id="member-canvas" class="hidden"></canvas>
+          <button id="capture-member-btn" class="hidden">Capture</button>
+          <button id="add-member-btn" aria-label="Add Member">Add Member</button>
+        </div>
+        <div id="member-settings">
+          <h3>Edit Participants</h3>
+          <div class="member-items" id="member-items"></div>
+        </div>
+        <div>
+          <h3>Manage Drinks</h3>
+          <input type="file" id="drink-picture" aria-label="Drink Picture">
+          <button id="camera-drink-btn">Take Picture</button>
+          <video id="drink-camera" class="hidden"></video>
+          <canvas id="drink-canvas" class="hidden"></canvas>
+          <button id="capture-drink-btn" class="hidden">Capture</button>
+          <select id="drink-type" aria-label="Drink Type">
+            <option value="tea">Tea</option>
+            <option value="coffee">Coffee</option>
+            <option value="orange">Orange</option>
+            <option value="apple">Apple</option>
+            <option value="blackcurrant">Blackcurrant</option>
+            <option value="water">Water</option>
+          </select>
+          <button id="add-drink-btn" aria-label="Add or Update Drink">Add/Update Drink</button>
+        </div>
+        <div id="drink-settings">
+          <h3>Edit Drinks</h3>
+          <div class="drink-items" id="drink-items"></div>
+        </div>
+        <button id="export-settings-btn" aria-label="Export Settings">Export Settings</button>
+        <button id="import-settings-btn" aria-label="Import Settings">Import Settings</button>
+        <input type="file" id="import-file" aria-label="Import Settings File">
+      </div>
+      <div class="modal-footer">
+        <button id="save-settings-btn" aria-label="Save Settings">Save</button>
+      </div>
+    </div>
+    <button id="toggle-settings-btn" aria-label="Open Settings">Settings</button>
+    <div>
+      <label for="theme-select">Choose a theme:</label>
+      <select id="theme-select" onchange="switchTheme(this.value)">
+  <option value="light">Light</option>
+  <option value="dark">Dark</option>
+  <option value="high-contrast">High Contrast</option>
+</select>
+</div>
+</div>
+
+<div class="container hidden" id="page2">
+<h1>Choose yourself, then choose a drink!</h1>
+<div class="clearfix">
+<div class="half scrollable" id="people-list"></div>
+<div class="half scrollable" id="drink-options"></div>
+</div>
+</div>
+
+<div class="container hidden" id="page3">
+  <h1>Drink choices below!</h1>
+  <div class="summary-container">
+    <div class="summary-grid" id="summary-list"></div>
+  </div>
+  <button id="restart-btn">Start again!</button>
+</div>
+
+<div id="confirmation-modal" class="modal" role="dialog" aria-labelledby="confirmation-modal-title">
+<div class="modal-header">
+<h2 id="confirmation-modal-title">Everyone's chosen a drink!</h2>
+<button id="close-confirmation-btn" aria-label="Close confirmation">&times;</button>
+</div>
+<div class="modal-body">
+<p>Continue to final list or make some changes?</p>
+</div>
+<div class="modal-footer">
+<button id="proceed-btn">Continue</button>
+<button id="change-btn">Make Changes</button>
+</div>
+</div>
+
+<script>
+let members = [];
+const drinks = ["tea", "coffee", "orange", "apple", "blackcurrant", "water"];
+let inSessionMembers = [];
+let selectedMemberIndex = -1;
+
+function updateProgressBar(percentage) {
+document.getElementById('progress-bar').style.width = percentage + '%';
+}
+
+function switchTheme(theme) {
+const root = document.documentElement;
+switch (theme) {
+  case 'light':
+    root.style.setProperty('--bg-color', '#f4f4f4');
+    root.style.setProperty('--text-color', '#000');
+    break;
+  case 'dark':
+    root.style.setProperty('--bg-color', '#333');
+    root.style.setProperty('--text-color', '#fff');
+    break;
+  case 'high-contrast':
+    root.style.setProperty('--bg-color', '#000');
+    root.style.setProperty('--text-color', '#00ff00');
+    break;
+}
+}
+
+function allowDrop(event) {
+event.preventDefault();
+}
+
+function drag(event) {
+event.dataTransfer.setData("text", event.target.id);
+}
+
+function drop(event) {
+event.preventDefault();
+const data = event.dataTransfer.getData("text");
+event.target.appendChild(document.getElementById(data));
+}
+
+function loadMembers() {
+const storedMembers = JSON.parse(localStorage.getItem('members')) || [];
+members = storedMembers;
+renderMembers();
+renderMemberSettings();
+}
+
+function renderMembers() {
+const memberList = document.getElementById('member-list');
+memberList.innerHTML = '';
+members.forEach((member, index) => {
+  const memberDiv = document.createElement('div');
+  memberDiv.id = `member-${index}`;
+  memberDiv.classList.add('member');
+  memberDiv.setAttribute('draggable', 'true');
+  memberDiv.setAttribute('ondragstart', 'drag(event)');
+  memberDiv.innerHTML = `<img src="${member.picture}" alt="${member.name}"><p>${member.name}</p>`;
+  memberDiv.addEventListener('click', () => {
+    memberDiv.classList.toggle('selected');
+  });
+  memberList.appendChild(memberDiv);
+});
+}
+
+function renderMemberSettings() {
+const memberItems = document.getElementById('member-items');
+memberItems.innerHTML = '';
+members.forEach((member, index) => {
+  const memberItem = document.createElement('div');
+  memberItem.classList.add('member-item');
+  memberItem.innerHTML = `
+    <img src="${member.picture}" alt="${member.name}">
+    <p>${member.name}</p>
+    <div>
+      <button onclick="editMember(${index})" aria-label="Edit Member ${member.name}">Edit</button>
+      <button onclick="removeMember(${index})" aria-label="Remove Member ${member.name}">Remove</button>
+    </div>
+  `;
+  memberItems.appendChild(memberItem);
+});
+}
+
+function loadDrinks() {
+renderDrinkSettings();
+}
+
+function renderDrinkSettings() {
+const drinkItems = document.getElementById('drink-items');
+drinkItems.innerHTML = '';
+drinks.forEach(drink => {
+  const drinkPicture = localStorage.getItem(`drink-${drink}`);
+  const drinkItem = document.createElement('div');
+  drinkItem.classList.add('drink-item');
+  drinkItem.innerHTML = `
+    ${drinkPicture ? `<img src="${drinkPicture}" alt="${drink}">` : ''}
+    <p>${drink}</p>
+    <div>
+      <button onclick="editDrink('${drink}')" aria-label="Edit Drink ${drink}">Edit</button>
+      <button onclick="removeDrink('${drink}')" aria-label="Remove Drink ${drink}">Remove</button>
+    </div>
+  `;
+  drinkItems.appendChild(drinkItem);
+});
+}
+
+function compressImage(file, callback) {
+const reader = new FileReader();
+reader.onload = function(event) {
+  const img = new Image();
+  img.src = event.target.result;
+  img.onload = function() {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 100;
+    canvas.height = 100;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    callback(canvas.toDataURL('image/jpeg', 0.7));
+  }
+}
+reader.readAsDataURL(file);
+}
+
+function editMember(index) {
+const memberName = prompt("Enter new name:", members[index].name);
+if (memberName !== null) {
+  members[index].name = memberName;
+  localStorage.setItem('members', JSON.stringify(members));
+  loadMembers();
+}
+}
+
+function removeMember(index) {
+if (confirm("Are you sure you want to remove this member?")) {
+  members.splice(index, 1);
+  localStorage.setItem('members', JSON.stringify(members));
+  loadMembers();
+}
+}
+
+function editDrink(drink) {
+const drinkPicture = document.getElementById('drink-picture').files[0];
+if (drinkPicture) {
+  compressImage(drinkPicture, (compressedPicture) => {
+    localStorage.setItem(`drink-${drink}`, compressedPicture);
+    loadDrinks();
+  });
+}
+}
+
+function removeDrink(drink) {
+if (confirm(`Are you sure you want to remove the picture for ${drink}?`)) {
+  localStorage.removeItem(`drink-${drink}`);
+  loadDrinks();
+}
+}
+
+function init() {
+loadMembers();
+loadDrinks();
+
+document.getElementById('start-btn').addEventListener('click', startSelection);
+
+document.getElementById('toggle-settings-btn').addEventListener('click', toggleSettings);
+
+document.getElementById('close-settings-btn').addEventListener('click', closeSettings);
+
+document.getElementById('add-member-btn').addEventListener('click', addMember);
+
+document.getElementById('camera-member-btn').addEventListener('click', () => startCamera('member'));
+document.getElementById('capture-member-btn').addEventListener('click', () => captureImage('member'));
+
+document.getElementById('camera-drink-btn').addEventListener('click', () => startCamera('drink'));
+document.getElementById('capture-drink-btn').addEventListener('click', () => captureImage('drink'));
+
+document.getElementById('add-drink-btn').addEventListener('click', addDrink);
+
+document.getElementById('export-settings-btn').addEventListener('click', exportSettings);
+
+document.getElementById('import-settings-btn').addEventListener('click', importSettings);
+
+document.getElementById('save-settings-btn').addEventListener('click', closeSettings);
+
+document.getElementById('proceed-btn').addEventListener('click', proceedToFinalList);
+
+document.getElementById('change-btn').addEventListener('click', () => document.getElementById('confirmation-modal').classList.remove('active'));
+
+document.getElementById('restart-btn').addEventListener('click', restartSelection);
+}
+
+function startCamera(type) {
+const video = document.getElementById(`${type}-camera`);
+const captureButton = document.getElementById(`capture-${type}-btn`);
+navigator.mediaDevices.getUserMedia({ video: true })
+  .then(stream => {
+    video.srcObject = stream;
+    video.play();
+    video.classList.remove('hidden');
+    captureButton.classList.remove('hidden');
+  });
+}
+
+function captureImage(type) {
+const video = document.getElementById(`${type}-camera`);
+const canvas = document.getElementById(`${type}-canvas`);
+const context = canvas.getContext('2d');
+context.drawImage(video, 0, 0, canvas.width, canvas.height);
+const imageData = canvas.toDataURL('image/jpeg', 0.7);
+
+if (type === 'member') {
+  document.getElementById('member-picture').dataset.imageData = imageData;
+} else if (type === 'drink') {
+  document.getElementById('drink-picture').dataset.imageData = imageData;
+}
+
+video.srcObject.getTracks().forEach(track => track.stop());
+video.classList.add('hidden');
+document.getElementById(`capture-${type}-btn`).classList.add('hidden');
+}
+
+function addMember() {
+const memberName = document.getElementById('member-name').value;
+const memberPicture = document.getElementById('member-picture').files[0];
+const memberPictureData = document.getElementById('member-picture').dataset.imageData;
+
+if (memberName && (memberPicture || memberPictureData)) {
+  if (memberPicture) {
+    compressImage(memberPicture, (compressedPicture) => {
+      saveMember(memberName, compressedPicture);
+    });
+  } else {
+    saveMember(memberName, memberPictureData);
+  }
+}
+}
+
+function saveMember(name, picture) {
+members.push({ name, picture });
+localStorage.setItem('members', JSON.stringify(members));
+loadMembers();
+}
+
+function addDrink() {
+const drinkType = document.getElementById('drink-type').value;
+const drinkPicture = document.getElementById('drink-picture').files[0];
+const drinkPictureData = document.getElementById('drink-picture').dataset.imageData;
+
+if (drinkPicture || drinkPictureData) {
+  if (drinkPicture) {
+    compressImage(drinkPicture, (compressedPicture) => {
+      saveDrink(drinkType, compressedPicture);
+    });
+  } else {
+    saveDrink(drinkType, drinkPictureData);
+  }
+}
+}
+
+function saveDrink(type, picture) {
+localStorage.setItem(`drink-${type}`, picture);
+loadDrinks();
+}
+
+function startSelection() {
+const selectedMembers = [];
+document.querySelectorAll('.member.selected').forEach(memberDiv => {
+  const memberIndex = Array.from(memberDiv.parentElement.children).indexOf(memberDiv);
+  selectedMembers.push(members[memberIndex]);
+});
+
+if (selectedMembers.length === 0) {
+  alert('Please select at least one member.');
+  return;
+}
+
+sessionStorage.setItem('insession', JSON.stringify({
+  members: selectedMembers
+}));
+
+inSessionMembers = selectedMembers.map(member => ({ ...member, drink: null }));
+document.getElementById('page1').classList.add('hidden');
+document.getElementById('page2').classList.remove('hidden');
+renderPeopleList();
+renderDrinkOptions();
+updateProgressBar(33);
+}
+
+function toggleSettings() {
+const settingsModal = document.getElementById('settings-modal');
+settingsModal.classList.toggle('active');
+}
+
+function closeSettings() {
+const settingsModal = document.getElementById('settings-modal');
+settingsModal.classList.remove('active');
+}
+
+function exportSettings() {
+const settings = {
+  members: JSON.parse(localStorage.getItem('members')),
+  drinks: drinks.reduce((acc, drink) => {
+    acc[drink] = localStorage.getItem(`drink-${drink}`);
+    return acc;
+  }, {})
+};
+const blob = new Blob([JSON.stringify(settings)], { type: 'application/json' });
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = 'settings.json';
+a.click();
+URL.revokeObjectURL(url);
+}
+
+function importSettings() {
+const fileInput = document.getElementById('import-file');
+const file = fileInput.files[0];
+if (file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const settings = JSON.parse(e.target.result);
+    localStorage.setItem('members', JSON.stringify(settings.members));
+    Object.keys(settings.drinks).forEach(drink => {
+      localStorage.setItem(`drink-${drink}`, settings.drinks[drink]);
+    });
+    loadMembers();
+    loadDrinks();
+  };
+  reader.readAsText(file);
+}
+}
+
+function proceedToFinalList() {
+document.getElementById('confirmation-modal').classList.remove('active');
+document.getElementById('page2').classList.add('hidden');
+document.getElementById('page3').classList.remove('hidden');
+renderSummary();
+updateProgressBar(100);
+}
+
+function restartSelection() {
+if (confirm("Are you sure you want to return to the start, does everyone have their drink?")) {
+  sessionStorage.clear();
+  document.getElementById('page3').classList.add('hidden');
+  document.getElementById('page1').classList.remove('hidden');
+  updateProgressBar(0);
+}
+}
+
+function renderPeopleList() {
+const peopleList = document.getElementById('people-list');
+peopleList.innerHTML = '';
+inSessionMembers.forEach((member, index) => {
+  const memberDiv = document.createElement('div');
+  memberDiv.classList.add('member', 'extra-large-img');
+  memberDiv.innerHTML = `<img src="${member.picture}" alt="${member.name}"><p>${member.name}</p><span class="drink-choice"></span>`;
+  memberDiv.addEventListener('click', () => {
+    if (selectedMemberIndex !== -1 && selectedMemberIndex !== index) {
+      const prevSelected = peopleList.children[selectedMemberIndex];
+      prevSelected.classList.remove('selected');
+    }
+    selectedMemberIndex = index;
+    memberDiv.classList.toggle('selected');
+    renderDrinkOptions();
+  });
+  peopleList.appendChild(memberDiv);
+});
+}
+
+function renderDrinkOptions() {
+const drinkOptions = document.getElementById('drink-options');
+drinkOptions.innerHTML = '';
+drinks.forEach(drink => {
+  const drinkPicture = localStorage.getItem(`drink-${drink}`);
+  const drinkDiv = document.createElement('div');
+  drinkDiv.classList.add('drink');
+  drinkDiv.innerHTML = `
+    ${drinkPicture ? `<img src="${drinkPicture}" alt="${drink}" class="large-img">` : `<p>${drink}</p>`}
+    <span>${drink}</span>
+  `;
+  drinkDiv.addEventListener('click', () => {
+    if (selectedMemberIndex !== -1) {
+      inSessionMembers[selectedMemberIndex].drink = drink;
+      const selectedMemberDiv = document.getElementById('people-list').children[selectedMemberIndex];
+      const drinkChoiceSpan = selectedMemberDiv.querySelector('.drink-choice');
+      drinkChoiceSpan.innerHTML = `<img src="${drinkPicture}" alt="${drink}" class="small-img">`;
+
+      drinkDiv.classList.add('highlight');
+      setTimeout(() => {
+        drinkDiv.classList.remove('highlight');
+      }, 1000);
+
+      selectedMemberDiv.classList.remove('selected');
+      selectedMemberIndex = -1;
+      renderDrinkOptions();
+      checkAllSelectionsDone();
+    }
+  });
+  drinkOptions.appendChild(drinkDiv);
+});
+}
+
+function checkAllSelectionsDone() {
+if (inSessionMembers.every(member => member.drink !== null)) {
+  document.getElementById('confirmation-modal').classList.add('active');
+}
+}
+
+function renderSummary() {
+  const summaryList = document.getElementById('summary-list');
+  summaryList.innerHTML = '';
+  inSessionMembers.forEach(member => {
+    const summaryItem = document.createElement('div');
+    summaryItem.classList.add('summary-item');
+    const drinkPicture = localStorage.getItem(`drink-${member.drink}`);
+    summaryItem.innerHTML = `
+      <img src="${member.picture}" alt="${member.name}" class="large-img">
+      <p>${member.name}</p>
+      <img src="${drinkPicture}" alt="${member.drink}" class="large-img">
+      <p>${member.drink.charAt(0).toUpperCase() + member.drink.slice(1)}</p> <!-- Add this line to display drink choice text -->
+    `;
+    summaryList.appendChild(summaryItem);
+  });
+}
+window.onload = init;
+</script>
+</body>
+</html>
